@@ -1,6 +1,7 @@
 body {
     font-family: Arial, sans-serif;
-    background-color: #f4f4f9;
+    background-color: #0b1120; /* Azul muy oscuro para el fondo general */
+    color: #e2e8f0; /* Texto claro para que se lea en fondo oscuro */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -10,8 +11,17 @@ body {
 .chart-container {
     width: 80%;
     max-width: 900px;
-    background: white;
+    background-color: #1e293b; /* Un azul grisáceo un poco más claro para la tarjeta */
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); /* Sombra más pronunciada */
+}
+
+.fuente-datos {
+    margin-top: 15px;
+    font-size: 0.75rem; /* Tamaño pequeño */
+    color: #94a3b8;    /* Un gris azulado suave que resalta poco */
+    opacity: 0.7;      /* Le da ese toque sutil de transparencia */
+    font-style: italic;
+    text-align: center;
 }
