@@ -23,30 +23,23 @@ function crearGrafico(datos) {
     // Buscamos en qué posición está el año 2024
     const index2024 = años.indexOf(2024);
 
-    // PLUGIN: Este código dibuja la línea de proyecciones a partir de 2024
+    // PLUGIN 1: Línea de proyecciones
     const pluginProyeccion = {
         id: 'lineaProyeccion',
         beforeDraw: (chart) => {
-            if (index2024 === -1) return; // Si no encuentra el 2024, no hace nada
-            
+            if (index2024 === -1) return;
             const { ctx, chartArea: { top, bottom, right }, scales: { x } } = chart;
             const xPos = x.getPixelForValue(index2024);
-
             ctx.save();
-            // 1. Dibuja un fondo sutil para el área de proyecciones
             ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.fillRect(xPos, top, right - xPos, bottom - top);
-
-            // 2. Dibuja la línea vertical punteada
             ctx.beginPath();
             ctx.moveTo(xPos, top);
             ctx.lineTo(xPos, bottom);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // Línea blanca semitransparente
-            ctx.setLineDash([5, 5]); // Hace que la línea sea punteada
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.setLineDash([5, 5]);
             ctx.stroke();
-
-            // 3. Escribe el texto indicativo
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.font = '12px Arial';
             ctx.fillText('  Proyecciones ➔', xPos + 5, top + 15);
@@ -54,9 +47,33 @@ function crearGrafico(datos) {
         }
     };
 
+    // PLUGIN 2: Anotaciones de texto al final de cada línea
+    const pluginEtiquetasFinales = {
+        id: 'etiquetasFinales',
+        afterDraw: (chart) => {
+            const { ctx } = chart;
+            ctx.save();
+            
+            chart.data.datasets.forEach((dataset, i) => {
+                const meta = chart.getDatasetMeta(i);
+                const ultimoPunto = meta.data[meta.data.length - 1]; // Coordenadas del último dato
+                
+                if (ultimoPunto && !ultimoPunto.skip) {
+                    ctx.fillStyle = dataset.borderColor; // Color igual a la línea
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Dibujamos el label 10px a la derecha del punto final
+                    ctx.fillText(dataset.label, ultimoPunto.x + 10, ultimoPunto.y);
+                }
+            });
+            ctx.restore();
+        }
+    };
+
     const ctx = document.getElementById('miGrafico').getContext('2d');
     
-    // Configuramos Chart.js para MODO OSCURO (textos y líneas de la grilla claras)
     Chart.defaults.color = '#cbd5e1'; 
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)'; 
 
@@ -66,22 +83,22 @@ function crearGrafico(datos) {
             labels: años,
             datasets: [
                 {
-                    label: 'Población 0-17 años (%)',
+                    label: '0-17 años', // Label simplificado para la anotación
                     data: datosJovenes,
-                    borderColor: '#36A2EB', // Azul
-                    backgroundColor: 'rgba(54, 162, 235, 0.4)', // Área azul transparente
-                    fill: true, // ESTO LO HACE GRÁFICO DE ÁREA
+                    borderColor: '#36A2EB',
+                    backgroundColor: 'rgba(54, 162, 235, 0.4)',
+                    fill: false,
                     borderWidth: 2,
-                    pointRadius: 0, // Oculta los puntos para que el área se vea limpia
-                    pointHitRadius: 10, // Pero mantiene la interacción al pasar el mouse
+                    pointRadius: 0,
+                    pointHitRadius: 10,
                     tension: 0.4
                 },
                 {
-                    label: 'Población 60+ años (%)',
+                    label: '60+ años',
                     data: datosMayores,
-                    borderColor: '#FF9800', // NARANJO
-                    backgroundColor: 'rgba(255, 152, 0, 0.4)', // Área naranja transparente
-                    fill: true, // ESTO LO HACE GRÁFICO DE ÁREA
+                    borderColor: '#FF9800',
+                    backgroundColor: 'rgba(255, 152, 0, 0.4)',
+                    fill: false,
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHitRadius: 10,
@@ -89,20 +106,28 @@ function crearGrafico(datos) {
                 }
             ]
         },
-        plugins: [pluginProyeccion], // Cargamos nuestro plugin del 2024 aquí
+        // Cargamos ambos plugins
+        plugins: [pluginProyeccion, pluginEtiquetasFinales], 
         options: {
             responsive: true,
+            layout: {
+                // Añadimos padding a la derecha para que las etiquetas no se corten
+                padding: {
+                    right: 80 
+                }
+            },
             plugins: {
+                legend: {
+                    display: false // ELIMINAMOS la leyenda tradicional
+                },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
-                        }
+                        label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`
                     }
                 }
             },
             scales: {
-                y: { title: { display: true, text: 'Porcentaje de la Población Total' } },
+                y: { title: { display: true, text: 'Porcentaje de la Población Total(%)' } },
                 x: { title: { display: true, text: 'Año' } }
             }
         }
