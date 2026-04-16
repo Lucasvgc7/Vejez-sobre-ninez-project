@@ -110,64 +110,49 @@ function crearGrafico(datos) {
         plugins: [pluginProyeccion, pluginEtiquetasFinales, 
             // NUEVO PLUGIN: Texto de Contexto Interior
             {
-                id: 'contextoTexto',
-                afterDraw: (chart) => {
-                    const { ctx, chartArea: { top, left, width }, scales: { x, y } } = chart;
-                    
-                    // Aseguramos que el índice 2024 existe para basar el cálculo
-                    if (index2024 === -1) return;
-                    
-                    const x2024Pixel = x.getPixelForValue(index2024);
-                    
-                    // Punto de partida del texto: un poco a la derecha de la línea 2024,
-                    // y un poco más abajo que la etiqueta "Proyecciones"
-                    const xContexto = x2024Pixel + 10; // 15px de margen
-                    let yContexto = top + 10; // Empieza 55px debajo del borde superior
+    id: 'contextoTexto',
+    afterDraw: (chart) => {
+        const { ctx, chartArea: { top }, scales: { x } } = chart;
+        if (index2024 === -1) return;
 
-                    const anchoMaxTexto = 250; // Un ancho fijo para el bloque
-                    const linePadding = 18; // Espaciado entre líneas
+        // Punto de anclaje (Línea de 2024)
+        const xBase = x.getPixelForValue(index2024);
+        const yBase = top;
 
-                    ctx.save();
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
+        // CONFIGURACIÓN MANUAL DE POSICIÓN
+        // x: píxeles a la derecha de la línea 2024
+        // y: píxeles hacia abajo desde el borde superior del gráfico
+        const bloquesTexto = [
+            { text: 'RESUMEN DEMOGRÁFICO: ', x: 15, y: 50, font: 'bold 13px sans-serif', color: '#fff' },
+            { text: 'A partir de 2024, las proyecciones muestran .', x: 15, y: 65, font: 'bold 11px sans-serif', color: '#fff' },
+            { text: 'un cruce clave.', x: 15, y: 80, font: 'bold 11px sans-serif', color: '#fff' },
+            
+            // Bloque Jóvenes
+            { text: 'Población 0-17 años:', x: 220, y: 285, font: 'bold 12px sans-serif', color: '#36A2EB' },
+            { text: 'Tendencia al descenso continuo.', x: 220, y: 300, font: '12px sans-serif', color: '#cbd5e1' },
 
-                    // Definimos los bloques de texto con estilos (para color y negrita)
-                    const bloquesTexto = [
-                        { text: 'RESUMEN DEMOGRÁFICO:', font: 'bold 12px sans-serif', color: '#fff' },
-                        { text: 'A partir de ', font: '13px sans-serif', color: '#cbd5e1' },
-                        { text: '2024', font: 'bold 13px sans-serif', color: '#fff', sameLine: true },
-                        { text: ' , las proyecciones', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
-                        { text: 'muestran un cruce clave:', font: '13px sans-serif', color: '#cbd5e1' },
-                        { text: '', font: '5px sans-serif', color: '#000' }, // Espacio vacío
-                        { text: 'El grupo ', font: '13px sans-serif', color: '#cbd5e1' },
-                        { text: '60+ años', font: 'bold 13px sans-serif', color: '#FF9800', sameLine: true },
-                        { text: ' (población', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
-                        { text: 'mayor) inicia un crecimiento acelerado.', font: '13px sans-serif', color: '#cbd5e1' },
-                        { text: 'El grupo ', font: '13px sans-serif', color: '#cbd5e1' },
-                        { text: '0-17 años', font: 'bold 13px sans-serif', color: '#36A2EB', sameLine: true },
-                        { text: ' (población', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
-                        { text: 'joven) continúa su descenso.', font: '13px sans-serif', color: '#cbd5e1' }
-                    ];
+            // Bloque Mayores
+            { text: 'Población 60+ años:', x: 220, y: 160, font: 'bold 12px sans-serif', color: '#FF9800' },
+            { text: 'Crecimiento acelerado proyectado.', x: 220, y: 175, font: '12px sans-serif', color: '#cbd5e1' },
+            
+            // Nota adicional (puedes moverla a cualquier parte)
+            { text: '* Datos post-2024 son estimaciones', x: 200, y: 350, font: 'italic 11px sans-serif', color: '#64748b' }
+        ];
 
-                    // Función para dibujar el texto con soporte básico de "mismo renglón"
-                    let offsetX = 0;
-                    bloquesTexto.forEach(block => {
-                        ctx.font = block.font;
-                        ctx.fillStyle = block.color;
-                        
-                        if (block.sameLine) {
-                            ctx.fillText(block.text, xContexto + offsetX, yContexto);
-                            offsetX += ctx.measureText(block.text).width;
-                        } else {
-                            yContexto += linePadding; // Salto de línea
-                            ctx.fillText(block.text, xContexto, yContexto);
-                            offsetX = ctx.measureText(block.text).width;
-                        }
-                    });
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
 
-                    ctx.restore();
-                }
-            }
+        bloquesTexto.forEach(block => {
+            ctx.font = block.font;
+            ctx.fillStyle = block.color;
+            // Dibujamos usando la base + el desplazamiento elegido
+            ctx.fillText(block.text, xBase + block.x, yBase + block.y);
+        });
+
+        ctx.restore();
+    }
+}
         ], 
         options: {
             responsive: true,
