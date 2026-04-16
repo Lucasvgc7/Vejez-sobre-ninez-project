@@ -107,18 +107,81 @@ function crearGrafico(datos) {
             ]
         },
         // Cargamos ambos plugins
-        plugins: [pluginProyeccion, pluginEtiquetasFinales], 
+        plugins: [pluginProyeccion, pluginEtiquetasFinales, 
+            // NUEVO PLUGIN: Texto de Contexto Interior
+            {
+                id: 'contextoTexto',
+                afterDraw: (chart) => {
+                    const { ctx, chartArea: { top, left, width }, scales: { x, y } } = chart;
+                    
+                    // Aseguramos que el índice 2024 existe para basar el cálculo
+                    if (index2024 === -1) return;
+                    
+                    const x2024Pixel = x.getPixelForValue(index2024);
+                    
+                    // Punto de partida del texto: un poco a la derecha de la línea 2024,
+                    // y un poco más abajo que la etiqueta "Proyecciones"
+                    const xContexto = x2024Pixel + 10; // 15px de margen
+                    let yContexto = top + 10; // Empieza 55px debajo del borde superior
+
+                    const anchoMaxTexto = 250; // Un ancho fijo para el bloque
+                    const linePadding = 18; // Espaciado entre líneas
+
+                    ctx.save();
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+
+                    // Definimos los bloques de texto con estilos (para color y negrita)
+                    const bloquesTexto = [
+                        { text: 'RESUMEN DEMOGRÁFICO:', font: 'bold 12px sans-serif', color: '#fff' },
+                        { text: 'A partir de ', font: '13px sans-serif', color: '#cbd5e1' },
+                        { text: '2024', font: 'bold 13px sans-serif', color: '#fff', sameLine: true },
+                        { text: ' , las proyecciones', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
+                        { text: 'muestran un cruce clave:', font: '13px sans-serif', color: '#cbd5e1' },
+                        { text: '', font: '5px sans-serif', color: '#000' }, // Espacio vacío
+                        { text: 'El grupo ', font: '13px sans-serif', color: '#cbd5e1' },
+                        { text: '60+ años', font: 'bold 13px sans-serif', color: '#FF9800', sameLine: true },
+                        { text: ' (población', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
+                        { text: 'mayor) inicia un crecimiento acelerado.', font: '13px sans-serif', color: '#cbd5e1' },
+                        { text: 'El grupo ', font: '13px sans-serif', color: '#cbd5e1' },
+                        { text: '0-17 años', font: 'bold 13px sans-serif', color: '#36A2EB', sameLine: true },
+                        { text: ' (población', font: '13px sans-serif', color: '#cbd5e1', sameLine: true },
+                        { text: 'joven) continúa su descenso.', font: '13px sans-serif', color: '#cbd5e1' }
+                    ];
+
+                    // Función para dibujar el texto con soporte básico de "mismo renglón"
+                    let offsetX = 0;
+                    bloquesTexto.forEach(block => {
+                        ctx.font = block.font;
+                        ctx.fillStyle = block.color;
+                        
+                        if (block.sameLine) {
+                            ctx.fillText(block.text, xContexto + offsetX, yContexto);
+                            offsetX += ctx.measureText(block.text).width;
+                        } else {
+                            yContexto += linePadding; // Salto de línea
+                            ctx.fillText(block.text, xContexto, yContexto);
+                            offsetX = ctx.measureText(block.text).width;
+                        }
+                    });
+
+                    ctx.restore();
+                }
+            }
+        ], 
         options: {
             responsive: true,
             layout: {
-                // Añadimos padding a la derecha para que las etiquetas no se corten
+                // Mantenemos el padding a la derecha para que las etiquetas finales de línea no se corten
                 padding: {
-                    right: 80 
+                    top: 10,
+                    right: 80, 
+                    bottom: 10
                 }
             },
             plugins: {
                 legend: {
-                    display: false // ELIMINAMOS la leyenda tradicional
+                    display: false // Mantenemos la leyenda tradicional oculta
                 },
                 tooltip: {
                     callbacks: {
@@ -127,8 +190,16 @@ function crearGrafico(datos) {
                 }
             },
             scales: {
-                y: { title: { display: true, text: 'Porcentaje de la Población Total(%)' } },
-                x: { title: { display: true, text: 'Año' } }
+                y: { 
+                    title: { display: true, text: 'Porcentaje de la Población Total(%)' },
+                    ticks: { color: '#cbd5e1' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                x: { 
+                    title: { display: true, text: 'Año' },
+                    ticks: { color: '#cbd5e1' },
+                    grid: { display: false } // Ocultamos las líneas de cuadrícula verticales para limpiar el texto
+                }
             }
         }
     });
