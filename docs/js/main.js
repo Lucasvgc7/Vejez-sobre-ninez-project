@@ -123,9 +123,9 @@ function crearGrafico(datos) {
         // x: píxeles a la derecha de la línea 2024
         // y: píxeles hacia abajo desde el borde superior del gráfico
         const bloquesTexto = [
-            { text: 'RESUMEN DEMOGRÁFICO: ', x: 15, y: 50, font: 'bold 13px sans-serif', color: '#fff' },
-            { text: 'A partir de 2024, las proyecciones muestran .', x: 15, y: 65, font: 'bold 11px sans-serif', color: '#fff' },
-            { text: 'un cruce clave.', x: 15, y: 80, font: 'bold 11px sans-serif', color: '#fff' },
+            { text: 'RESUMEN DEMOGRÁFICO: ', x: 15, y: 50, font: 'bold 13px sans-serif', color: '#cbd5e1' },
+            { text: 'A partir de 2024, las proyecciones muestran', x: 15, y: 65, font: '12px sans-serif', color: '#cbd5e1' },
+            { text: 'un cruce clave.', x: 15, y: 80, font: '12px sans-serif', color: '#cbd5e1' },
             
             // Bloque Jóvenes
             { text: 'Población 0-17 años:', x: 220, y: 285, font: 'bold 12px sans-serif', color: '#36A2EB' },
