@@ -455,6 +455,7 @@ function generarGraficoPastel(
         legend: {
           position: "bottom",
           labels: { color: "#cbd5e1" },
+          onClick: null,
         },
         tooltip: {
           callbacks: {
