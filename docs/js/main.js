@@ -400,98 +400,115 @@ function crearGrafico(datos) {
     },
   });
 
-  // --- LÓGICA DE TONE.JS ---
+  // --- LÓGICA DE TONE.JS (Pausa y Reproducción) ---
+  let synthJovenes = null;
+  let synthMayores = null;
+  let loopSonoro = null;
+
+  const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
+  const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
+  
   const btnReproducir = document.getElementById("btnReproducir");
+  const btnPausa = document.getElementById("btnPausa"); // Asegúrate de tener este ID en tu HTML
 
   btnReproducir.addEventListener("click", async () => {
     await Tone.start();
+    
+    // 1. Inicialización de Synths (Solo una vez)
+    if (!synthJovenes) {
+      synthJovenes = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 },
+      }).toDestination();
+      synthJovenes.volume.value = -12;
+
+      synthMayores = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 },
+      }).toDestination();
+      synthMayores.volume.value = -6;
+    }
+
+    // 2. Reiniciar índice si terminó la reproducción previa
+    if (indiceReproduccion >= años.length || indiceReproduccion === -1) {
+      indiceReproduccion = 0;
+    }
 
     btnReproducir.disabled = true;
+    btnPausa.disabled = false;
     btnReproducir.innerText = "Reproduciendo...";
-    indiceReproduccion = 0;
+    btnPausa.innerText = "⏸ Pausar";
 
-    Tone.Transport.cancel();
-    Tone.Transport.stop();
+    // 3. Crear el Loop si no existe
+    if (!loopSonoro) {
+      loopSonoro = new Tone.Loop((time) => {
+        if (indiceReproduccion >= años.length) {
+          Tone.Transport.stop();
+          indiceReproduccion = -1;
+          miGrafico.update("none");
+          btnReproducir.disabled = false;
+          btnPausa.disabled = true;
+          btnReproducir.innerText = "▶ Escuchar Evolución Poblacional";
+          return;
+        }
 
-    const synthJovenes = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "triangle" },
-      envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 },
-    }).toDestination();
-    synthJovenes.volume.value = -12;
+        const valorJovenes = pctJovenes[indiceReproduccion];
+        const valorMayores = pctMayores[indiceReproduccion];
+        const divisor = 8;
+        const exponente = 1.5;
 
-    const synthMayores = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "triangle" },
-      envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 },
-    }).toDestination();
-    synthMayores.volume.value = -6;
+        const cantJovenes = Math.max(1, Math.floor(Math.pow(valorJovenes / divisor, exponente)));
+        const cantMayores = Math.max(1, Math.floor(Math.pow(valorMayores / divisor, exponente)));
 
-    const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
-    const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
+        const duracionPaso = Tone.Time("8n").toSeconds();
 
-    const loop = new Tone.Loop((time) => {
-      if (indiceReproduccion >= años.length) {
-        Tone.Transport.stop();
-        indiceReproduccion = -1;
+        for (let i = 0; i < cantJovenes; i++) {
+          const desfase = Math.random() * duracionPaso * 0.8;
+          const notaAleatoria = notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
+          synthJovenes.triggerAttackRelease(notaAleatoria, "32n", time + desfase);
+        }
+
+        for (let i = 0; i < cantMayores; i++) {
+          const desfase = Math.random() * duracionPaso * 0.8;
+          const notaAleatoria = notasMayores[Math.floor(Math.random() * notasMayores.length)];
+          synthMayores.triggerAttackRelease(notaAleatoria, "16n", time + desfase);
+        }
+
+        // Actualización de UI (Barra y Gráfico Principal)
+        const jAudio = pobJovenes[indiceReproduccion];
+        const mAudio = pobMayores[indiceReproduccion];
+        const rAudio = totalesPorAño[indiceReproduccion] - jAudio - mAudio;
+
+        document.getElementById("tituloBarra").innerText = `Población en ${años[indiceReproduccion]}`;
+        chartBarra.data.datasets[0].data = [jAudio];
+        chartBarra.data.datasets[1].data = [rAudio];
+        chartBarra.data.datasets[2].data = [mAudio];
+        chartBarra.update();
+
         miGrafico.update("none");
-        btnReproducir.disabled = false;
-        btnReproducir.innerText = "▶ Escuchar Evolución Poblacional";
-        return;
-      }
+        indiceReproduccion++;
+      }, "8n");
 
-      // AQUI USAMOS LOS PORCENTAJES (Para mantener controlada la densidad de notas)
-      const valorJovenes = pctJovenes[indiceReproduccion];
-      const valorMayores = pctMayores[indiceReproduccion];
+      Tone.Transport.bpm.value = 110;
+      loopSonoro.start(0);
+    }
 
-      const divisor = 8;
-      const exponente = 1.5;
-
-      const cantJovenes = Math.max(
-        1,
-        Math.floor(Math.pow(valorJovenes / divisor, exponente)),
-      );
-      const cantMayores = Math.max(
-        1,
-        Math.floor(Math.pow(valorMayores / divisor, exponente)),
-      );
-
-      const duracionPaso = Tone.Time("8n").toSeconds();
-
-      for (let i = 0; i < cantJovenes; i++) {
-        const desfase = Math.random() * duracionPaso * 0.8;
-        const notaAleatoria =
-          notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
-        synthJovenes.triggerAttackRelease(notaAleatoria, "32n", time + desfase);
-      }
-
-      for (let i = 0; i < cantMayores; i++) {
-        const desfase = Math.random() * duracionPaso * 0.8;
-        const notaAleatoria =
-          notasMayores[Math.floor(Math.random() * notasMayores.length)];
-        synthMayores.triggerAttackRelease(notaAleatoria, "16n", time + desfase);
-      }
-
-      // Actualización de la barra apilada en la reproducción de audio
-      const jAudio = pobJovenes[indiceReproduccion];
-      const mAudio = pobMayores[indiceReproduccion];
-      const rAudio = totalesPorAño[indiceReproduccion] - jAudio - mAudio;
-
-      document.getElementById("tituloBarra").innerText =
-        `Población en ${años[indiceReproduccion]}`;
-      chartBarra.data.datasets[0].data = [jAudio];
-      chartBarra.data.datasets[1].data = [rAudio];
-      chartBarra.data.datasets[2].data = [mAudio];
-      chartBarra.update();
-
-      miGrafico.update("none");
-      indiceReproduccion++;
-    }, "8n");
-
-    Tone.Transport.bpm.value = 110;
-    loop.start(0);
     Tone.Transport.start();
   });
-}
 
+  // --- LÓGICA DE PAUSA ---
+  btnPausa.addEventListener("click", () => {
+    if (Tone.Transport.state === "started") {
+      Tone.Transport.pause(); // Mantiene el índice donde quedó
+      btnPausa.innerText = "▶ Reanudar";
+      btnReproducir.innerText = "En Pausa";
+    } else {
+      Tone.Transport.start();
+      btnPausa.innerText = "⏸ Pausar";
+      btnReproducir.innerText = "Reproduciendo...";
+    }
+  });
+}
 // ==========================================
 // LÓGICA DEL GRÁFICO DE PASTEL FLOTANTE
 // ==========================================
