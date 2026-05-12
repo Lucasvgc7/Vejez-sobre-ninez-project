@@ -14,24 +14,6 @@
     <link rel="stylesheet" href="./css/style.css">
     <script src="./js/main.js" defer></script>
 
-    <style>
-        /* Estilo rápido para el botón de reproducción */
-        .btn-play {
-            display: block;
-            margin: 20px auto;
-            padding: 10px 20px;
-            background-color: #36A2EB;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .btn-play:hover { background-color: #2b84c0; }
-        .btn-play:disabled { background-color: #64748b; cursor: not-allowed; }
-    </style>
 </head>
 <body>
 
@@ -39,8 +21,18 @@
     
     <button id="btnReproducir" class="btn-play">▶ Escuchar Evolución Poblacional</button>
 
-    <div class="chart-container">
+    <div class="chart-container" style="position: relative; padding: 0;">
+        
         <canvas id="miGrafico"></canvas>
+
+        <div id="contenedorPastel" style="display: none; position: absolute; top: 20px; left: 80px; width: 220px; padding: 15px; background: #0b1120; backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); text-align: center; z-index: 10;">
+            <h3 id="tituloPastel" style="color: #cbd5e1; margin-top: 0; margin-bottom: 10px; font-size: 14px;"></h3>
+            
+            <canvas id="miGraficoPastel"></canvas>
+            
+            <button onclick="document.getElementById('contenedorPastel').style.display='none'" style="margin-top: 15px; padding: 6px 12px; font-size: 12px; background-color: #747d8a; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; transition: background 0.2s;">Ocultar</button>
+        </div>
+
     </div>
 
     <p class="fuente-datos">Fuente: Instituto Nacional de Estadísticas (INE)</p>
