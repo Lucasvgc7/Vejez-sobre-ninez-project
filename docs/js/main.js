@@ -20,8 +20,10 @@ function crearGrafico(datos) {
         .filter(fila => fila.Grupo_Edad === '60+')
         .map(fila => fila.PORCENTAJE);
 
-    // Buscamos en qué posición está el año 2024
     const index2024 = años.indexOf(2024);
+    
+    // Variable para controlar la posición de la música y la línea de tiempo
+    let indiceReproduccion = -1;
 
     // PLUGIN 1: Línea de proyecciones
     const pluginProyeccion = {
@@ -47,24 +49,20 @@ function crearGrafico(datos) {
         }
     };
 
-    // PLUGIN 2: Anotaciones de texto al final de cada línea
+    // PLUGIN 2: Anotaciones de texto finales
     const pluginEtiquetasFinales = {
         id: 'etiquetasFinales',
         afterDraw: (chart) => {
             const { ctx } = chart;
             ctx.save();
-            
             chart.data.datasets.forEach((dataset, i) => {
                 const meta = chart.getDatasetMeta(i);
-                const ultimoPunto = meta.data[meta.data.length - 1]; // Coordenadas del último dato
-                
+                const ultimoPunto = meta.data[meta.data.length - 1];
                 if (ultimoPunto && !ultimoPunto.skip) {
-                    ctx.fillStyle = dataset.borderColor; // Color igual a la línea
+                    ctx.fillStyle = dataset.borderColor;
                     ctx.font = 'bold 14px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    
-                    // Dibujamos el label 10px a la derecha del punto final
                     ctx.fillText(dataset.label, ultimoPunto.x + 10, ultimoPunto.y);
                 }
             });
@@ -72,18 +70,42 @@ function crearGrafico(datos) {
         }
     };
 
+    // PLUGIN 3: Cursor de reproducción (se mueve con el audio)
+    const pluginCursorSonoro = {
+        id: 'cursorSonoro',
+        afterDraw: (chart) => {
+            if (indiceReproduccion === -1) return;
+            const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+            const xPos = x.getPixelForValue(indiceReproduccion);
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(xPos, top);
+            ctx.lineTo(xPos, bottom);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.stroke();
+            
+            // Dibujar el año actual flotando
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(años[indiceReproduccion], xPos, top - 10);
+            ctx.restore();
+        }
+    };
+
     const ctx = document.getElementById('miGrafico').getContext('2d');
-    
     Chart.defaults.color = '#cbd5e1'; 
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)'; 
 
-    new Chart(ctx, {
+    const miGrafico = new Chart(ctx, {
         type: 'line',
         data: {
             labels: años,
             datasets: [
                 {
-                    label: '0-17 años', // Label simplificado para la anotación
+                    label: '0-17 años',
                     data: datosJovenes,
                     borderColor: '#36A2EB',
                     backgroundColor: 'rgba(54, 162, 235, 0.4)',
@@ -106,68 +128,12 @@ function crearGrafico(datos) {
                 }
             ]
         },
-        // Cargamos ambos plugins
-        plugins: [pluginProyeccion, pluginEtiquetasFinales, 
-            // NUEVO PLUGIN: Texto de Contexto Interior
-            {
-    id: 'contextoTexto',
-    afterDraw: (chart) => {
-        const { ctx, chartArea: { top }, scales: { x } } = chart;
-        if (index2024 === -1) return;
-
-        // Punto de anclaje (Línea de 2024)
-        const xBase = x.getPixelForValue(index2024);
-        const yBase = top;
-
-        // CONFIGURACIÓN MANUAL DE POSICIÓN
-        // x: píxeles a la derecha de la línea 2024
-        // y: píxeles hacia abajo desde el borde superior del gráfico
-        const bloquesTexto = [
-            { text: 'RESUMEN DEMOGRÁFICO: ', x: 15, y: 50, font: 'bold 13px sans-serif', color: '#cbd5e1' },
-            { text: 'A partir de 2024, las proyecciones muestran', x: 15, y: 65, font: '12px sans-serif', color: '#cbd5e1' },
-            { text: 'un cruce clave.', x: 15, y: 80, font: '12px sans-serif', color: '#cbd5e1' },
-            
-            // Bloque Jóvenes
-            { text: 'Población 0-17 años:', x: 220, y: 285, font: 'bold 12px sans-serif', color: '#36A2EB' },
-            { text: 'Tendencia al descenso continuo.', x: 220, y: 300, font: '12px sans-serif', color: '#cbd5e1' },
-
-            // Bloque Mayores
-            { text: 'Población 60+ años:', x: 220, y: 160, font: 'bold 12px sans-serif', color: '#FF9800' },
-            { text: 'Crecimiento acelerado proyectado.', x: 220, y: 175, font: '12px sans-serif', color: '#cbd5e1' },
-            
-            // Nota adicional (puedes moverla a cualquier parte)
-            { text: '* Datos post-2024 son estimaciones', x: 200, y: 350, font: 'italic 11px sans-serif', color: '#64748b' }
-        ];
-
-        ctx.save();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-
-        bloquesTexto.forEach(block => {
-            ctx.font = block.font;
-            ctx.fillStyle = block.color;
-            // Dibujamos usando la base + el desplazamiento elegido
-            ctx.fillText(block.text, xBase + block.x, yBase + block.y);
-        });
-
-        ctx.restore();
-    }
-}
-        ], 
+        plugins: [pluginProyeccion, pluginEtiquetasFinales, pluginCursorSonoro], 
         options: {
             responsive: true,
-            layout: {
-                // Mantenemos el padding a la derecha para que las etiquetas finales de línea no se corten
-                padding: {
-                    top: 10,
-                    right: 80, 
-                    bottom: 10
-                }
-            },
+            layout: { padding: { top: 25, right: 80, bottom: 10 } },
             plugins: {
-                legend: {
-                    display: false // Mantenemos la leyenda tradicional oculta
-                },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`
@@ -176,16 +142,98 @@ function crearGrafico(datos) {
             },
             scales: {
                 y: { 
-                    title: { display: true, text: 'Porcentaje de la Población Total(%)' },
+                    title: { display: true, text: 'Porcentaje de la Población Total (%)' },
                     ticks: { color: '#cbd5e1' },
                     grid: { color: 'rgba(255, 255, 255, 0.05)' }
                 },
                 x: { 
                     title: { display: true, text: 'Año' },
                     ticks: { color: '#cbd5e1' },
-                    grid: { display: false } // Ocultamos las líneas de cuadrícula verticales para limpiar el texto
+                    grid: { display: false }
                 }
             }
         }
+    });
+
+// --- LÓGICA DE TONE.JS (Por Cantidad/Densidad) ---
+    const btnReproducir = document.getElementById('btnReproducir');
+    
+    btnReproducir.addEventListener('click', async () => {
+        await Tone.start();
+        
+        btnReproducir.disabled = true;
+        btnReproducir.innerText = "Reproduciendo...";
+        indiceReproduccion = 0;
+
+        Tone.Transport.cancel();
+        Tone.Transport.stop();
+
+        // 1. Sintetizadores con volumen fijo
+        // Usamos PolySynth para poder tocar múltiples notas al mismo tiempo sin que se corten.
+        // Se reduce el volumen general (volume.value) para evitar saturación cuando se apilan muchas notas.
+        
+        const synthJovenes = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" }, // Agudo
+            envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 } // Sonidos cortos y rápidos
+        }).toDestination();
+        synthJovenes.volume.value = -12; 
+
+        const synthMayores = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" }, // Grave
+            envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 }
+        }).toDestination();
+        synthMayores.volume.value = -2;
+
+        // Notas posibles para generar un efecto de "multitud" en lugar de repetir siempre el mismo tono
+        const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
+        const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
+
+        // 2. Ciclo de reproducción
+        const loop = new Tone.Loop((time) => {
+            if (indiceReproduccion >= años.length) {
+                Tone.Transport.stop();
+                indiceReproduccion = -1;
+                miGrafico.update('none');
+                btnReproducir.disabled = false;
+                btnReproducir.innerText = "▶ Escuchar Evolución Poblacional";
+                return;
+            }
+
+            const pctJovenes = datosJovenes[indiceReproduccion];
+            const pctMayores = datosMayores[indiceReproduccion];
+
+            // 3. Mapear porcentaje a CANTIDAD de sonidos
+            // Dividimos por 5 para escalar. Ej: 30% -> 6 sonidos. 10% -> 2 sonidos.
+            // Math.max asegura que siempre suene al menos 1 nota si hay datos.
+            const cantJovenes = Math.max(1, Math.round(pctJovenes / 5));
+            const cantMayores = Math.max(1, Math.round(pctMayores / 5));
+
+            // Calculamos cuánto dura el "paso" actual para distribuir los sonidos en ese espacio
+            const duracionPaso = Tone.Time("8n").toSeconds();
+
+            // Disparar las notas de los jóvenes
+            for (let i = 0; i < cantJovenes; i++) {
+                // Desfase aleatorio para que no suenen todas exactamente en el mismo milisegundo (efecto orgánico)
+                const desfase = Math.random() * duracionPaso * 0.8; 
+                const notaAleatoria = notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
+                
+                synthJovenes.triggerAttackRelease(notaAleatoria, "32n", time + desfase);
+            }
+
+            // Disparar las notas de los mayores
+            for (let i = 0; i < cantMayores; i++) {
+                const desfase = Math.random() * duracionPaso * 0.8; 
+                const notaAleatoria = notasMayores[Math.floor(Math.random() * notasMayores.length)];
+                
+                synthMayores.triggerAttackRelease(notaAleatoria, "16n", time + desfase);
+            }
+
+            miGrafico.update('none');
+            indiceReproduccion++;
+        }, "8n"); 
+
+        Tone.Transport.bpm.value = 110; // Reduje un poco el tempo para que se aprecien mejor las "multitudes" de notas
+        loop.start(0);
+        Tone.Transport.start();
     });
 }

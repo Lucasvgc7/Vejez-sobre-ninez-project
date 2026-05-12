@@ -9,22 +9,41 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
     <link rel="stylesheet" href="./css/style.css">
-    
     <script src="./js/main.js" defer></script>
+
+    <style>
+        /* Estilo rápido para el botón de reproducción */
+        .btn-play {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #36A2EB;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-play:hover { background-color: #2b84c0; }
+        .btn-play:disabled { background-color: #64748b; cursor: not-allowed; }
+    </style>
 </head>
 <body>
 
     <h2>Evolución poblacional dependiente en Chile <img src="./assets/Bandera_chilena.png" alt="Bandera de Chile" style="width: 24px; vertical-align: middle;"></h2>
     
+    <button id="btnReproducir" class="btn-play">▶ Escuchar Evolución Poblacional</button>
+
     <div class="chart-container">
         <canvas id="miGrafico"></canvas>
     </div>
 
-</body>
-
-<p class="fuente-datos">Fuente: Instituto Nacional de Estadísticas (INE)</p>
+    <p class="fuente-datos">Fuente: Instituto Nacional de Estadísticas (INE)</p>
 
 </body>
 </html>
