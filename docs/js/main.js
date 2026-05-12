@@ -15,8 +15,6 @@ function crearGrafico(datos) {
   const datosLimpios = datos.filter((fila) => fila.AÑO != null);
   const años = [...new Set(datosLimpios.map((fila) => fila.AÑO))];
 
-  // --- SEPARACIÓN DE DATOS ---
-  // 1. Datos para el Gráfico Visual (Números absolutos de población)
   const pobJovenes = datosLimpios
     .filter((fila) => fila.Grupo_Edad === "0-17")
     .map((fila) => fila.POBLACION);
@@ -25,12 +23,10 @@ function crearGrafico(datos) {
     .filter((fila) => fila.Grupo_Edad === "60+")
     .map((fila) => fila.POBLACION);
 
-  // 2. Totales poblacionales por año (Para calcular el resto en el gráfico de pastel)
   const totalesPorAño = datosLimpios
-    .filter((fila) => fila.Grupo_Edad === "0-17") // Usamos un grupo de filtro solo para obtener 1 registro por año
+    .filter((fila) => fila.Grupo_Edad === "0-17")
     .map((fila) => fila.TOTAL);
 
-  // 3. Datos para el Audio (Porcentajes para evitar que Tone.js colapse con números en millones)
   const pctJovenes = datosLimpios
     .filter((fila) => fila.Grupo_Edad === "0-17")
     .map((fila) => fila.PORCENTAJE);
@@ -39,13 +35,84 @@ function crearGrafico(datos) {
     .filter((fila) => fila.Grupo_Edad === "60+")
     .map((fila) => fila.PORCENTAJE);
 
-  // Buscamos en qué posición está el año 2024
   const index2024 = años.indexOf(2024);
-
-  // Variable para controlar la posición de la música y la línea de tiempo
   let indiceReproduccion = -1;
+  let añoHoverActual = -1;
 
-  // PLUGIN 1: Línea de proyecciones
+  // ==========================================
+  // INICIALIZACIÓN DEL GRÁFICO DE BARRAS APILADAS
+  // ==========================================
+  const ctxBarra = document.getElementById("miGraficoBarra").getContext("2d");
+
+  const initJovenes = pobJovenes[0];
+  const initMayores = pobMayores[0];
+  const initResto = totalesPorAño[0] - initJovenes - initMayores;
+
+  document.getElementById("tituloBarra").innerText = `Población en ${años[0]}`;
+
+  let chartBarra = new Chart(ctxBarra, {
+    type: "bar",
+    data: {
+      labels: ["Total"], // Un solo label para que exista una sola barra
+      datasets: [
+        {
+          label: "0-17 años",
+          data: [initJovenes],
+          backgroundColor: "#36A2EB",
+        },
+        {
+          label: "Resto de la población",
+          data: [initResto],
+          backgroundColor: "rgba(255, 255, 255, 0.2)",
+        },
+        {
+          label: "60+ años",
+          data: [initMayores],
+          backgroundColor: "#FF9800",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false, // Ayuda a que la barra se estire bien en el sidebar
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: { color: "#cbd5e1", boxWidth: 12, font: { size: 10 } },
+          onClick: null, // Para que no oculten las secciones de la barra sin querer
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) =>
+              ` ${context.dataset.label}: ${context.parsed.y.toLocaleString("es-CL")} pers.`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          stacked: true, // ¡ESTO HACE LA MAGIA DE APILAR!
+          beginAtZero: true,
+          ticks: {
+            color: "#cbd5e1",
+            callback: function (value) {
+              return (value / 1000000).toFixed(1) + "M";
+            },
+          },
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
+        },
+        x: {
+          stacked: true, // Apilamos el eje X también
+          ticks: { display: false }, // Ocultamos el texto "Total" abajo de la barra
+          grid: { display: false },
+        },
+      },
+    },
+  });
+
+  // ==========================================
+  // PLUGINS DEL GRÁFICO PRINCIPAL
+  // ==========================================
   const pluginProyeccion = {
     id: "lineaProyeccion",
     beforeDraw: (chart) => {
@@ -73,7 +140,6 @@ function crearGrafico(datos) {
     },
   };
 
-  // PLUGIN 2: Anotaciones de texto al final de cada línea
   const pluginEtiquetasFinales = {
     id: "etiquetasFinales",
     afterDraw: (chart) => {
@@ -89,7 +155,6 @@ function crearGrafico(datos) {
           ctx.font = "bold 14px sans-serif";
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-
           ctx.fillText(dataset.label, ultimoPunto.x + 10, ultimoPunto.y);
         }
       });
@@ -97,7 +162,6 @@ function crearGrafico(datos) {
     },
   };
 
-  // PLUGIN 3: Cursor de reproducción (se mueve con el audio)
   const pluginCursorSonoro = {
     id: "cursorSonoro",
     afterDraw: (chart) => {
@@ -126,7 +190,6 @@ function crearGrafico(datos) {
   };
 
   const ctx = document.getElementById("miGrafico").getContext("2d");
-
   Chart.defaults.color = "#cbd5e1";
   Chart.defaults.borderColor = "rgba(255, 255, 255, 0.1)";
 
@@ -137,7 +200,7 @@ function crearGrafico(datos) {
       datasets: [
         {
           label: "0-17 años",
-          data: pobJovenes, // Usamos la Población Absoluta
+          data: pobJovenes,
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.4)",
           fill: false,
@@ -148,7 +211,7 @@ function crearGrafico(datos) {
         },
         {
           label: "60+ años",
-          data: pobMayores, // Usamos la Población Absoluta
+          data: pobMayores,
           borderColor: "#FF9800",
           backgroundColor: "rgba(255, 152, 0, 0.4)",
           fill: false,
@@ -217,14 +280,14 @@ function crearGrafico(datos) {
             {
               text: "Población 60+ años:",
               x: 220,
-              y: 120,
+              y: 160,
               font: "bold 12px sans-serif",
               color: "#FF9800",
             },
             {
               text: "Crecimiento acelerado proyectado.",
               x: 220,
-              y: 135,
+              y: 175,
               font: "12px sans-serif",
               color: "#cbd5e1",
             },
@@ -253,6 +316,30 @@ function crearGrafico(datos) {
       },
     ],
     options: {
+      onHover: (event, elements, chart) => {
+        if (elements.length > 0) {
+          const dataIndex = elements[0].index;
+
+          if (dataIndex !== añoHoverActual) {
+            añoHoverActual = dataIndex;
+
+            const añoHover = chart.data.labels[dataIndex];
+            const j = pobJovenes[dataIndex];
+            const m = pobMayores[dataIndex];
+            const t = totalesPorAño[dataIndex];
+            const r = t - j - m;
+
+            document.getElementById("tituloBarra").innerText =
+              `Población en ${añoHover}`;
+
+            // Actualizamos las 3 porciones de la barra apilada
+            chartBarra.data.datasets[0].data = [j];
+            chartBarra.data.datasets[1].data = [r];
+            chartBarra.data.datasets[2].data = [m];
+            chartBarra.update();
+          }
+        }
+      },
       onClick: (event, elements, chart) => {
         if (elements.length > 0) {
           const datasetIndex = elements[0].datasetIndex;
@@ -263,13 +350,11 @@ function crearGrafico(datos) {
           const etiqueta = chart.data.datasets[datasetIndex].label;
           const colorLinea = chart.data.datasets[datasetIndex].borderColor;
 
-          // Extraemos el total de población de ese año exacto
           const poblacionTotalDelAño = totalesPorAño[dataIndex];
 
           const xCoord = elements[0].element.x;
           const yCoord = elements[0].element.y;
 
-          // Ahora pasamos la población y el total del año a la función del pastel
           generarGraficoPastel(
             año,
             etiqueta,
@@ -289,7 +374,6 @@ function crearGrafico(datos) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            // Formateamos el número para que tenga puntos de miles (Ej: 3.500.000)
             label: (context) =>
               `${context.dataset.label}: ${context.parsed.y.toLocaleString("es-CL")} personas`,
           },
@@ -297,7 +381,7 @@ function crearGrafico(datos) {
       },
       scales: {
         y: {
-          title: { display: true, text: "Población (N° de personas)" }, // Cambiado el título del eje
+          title: { display: true, text: "Población (N° de personas)" },
           ticks: {
             color: "#cbd5e1",
             // Agregamos puntos de miles al eje Y también
@@ -386,6 +470,18 @@ function crearGrafico(datos) {
         synthMayores.triggerAttackRelease(notaAleatoria, "16n", time + desfase);
       }
 
+      // Actualización de la barra apilada en la reproducción de audio
+      const jAudio = pobJovenes[indiceReproduccion];
+      const mAudio = pobMayores[indiceReproduccion];
+      const rAudio = totalesPorAño[indiceReproduccion] - jAudio - mAudio;
+
+      document.getElementById("tituloBarra").innerText =
+        `Población en ${años[indiceReproduccion]}`;
+      chartBarra.data.datasets[0].data = [jAudio];
+      chartBarra.data.datasets[1].data = [rAudio];
+      chartBarra.data.datasets[2].data = [mAudio];
+      chartBarra.update();
+
       miGrafico.update("none");
       indiceReproduccion++;
     }, "8n");
@@ -399,7 +495,6 @@ function crearGrafico(datos) {
 // ==========================================
 // LÓGICA DEL GRÁFICO DE PASTEL FLOTANTE
 // ==========================================
-// ACTUALIZADO: Ahora recibe la población y el total
 function generarGraficoPastel(
   año,
   etiqueta,
