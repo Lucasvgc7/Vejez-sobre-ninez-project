@@ -182,7 +182,7 @@ function crearGrafico(datos) {
             oscillator: { type: "triangle" }, // Grave
             envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 }
         }).toDestination();
-        synthMayores.volume.value = -2;
+        synthMayores.volume.value = -6;
 
         // Notas posibles para generar un efecto de "multitud" en lugar de repetir siempre el mismo tono
         const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
@@ -202,11 +202,13 @@ function crearGrafico(datos) {
             const pctJovenes = datosJovenes[indiceReproduccion];
             const pctMayores = datosMayores[indiceReproduccion];
 
-            // 3. Mapear porcentaje a CANTIDAD de sonidos
-            // Dividimos por 5 para escalar. Ej: 30% -> 6 sonidos. 10% -> 2 sonidos.
-            // Math.max asegura que siempre suene al menos 1 nota si hay datos.
-            const cantJovenes = Math.max(1, Math.round(pctJovenes / 5));
-            const cantMayores = Math.max(1, Math.round(pctMayores / 5));
+            // 3. Mapear porcentaje a CANTIDAD de sonidos (Mapeo Exponencial)
+            
+            const divisor = 8; 
+            const exponente = 1.5;
+
+            const cantJovenes = Math.max(1, Math.floor(Math.pow(pctJovenes / divisor, exponente)));
+            const cantMayores = Math.max(1, Math.floor(Math.pow(pctMayores / divisor, exponente)));
 
             // Calculamos cuánto dura el "paso" actual para distribuir los sonidos en ese espacio
             const duracionPaso = Tone.Time("8n").toSeconds();
