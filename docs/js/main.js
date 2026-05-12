@@ -443,7 +443,7 @@ function generarGraficoPastel(
       datasets: [
         {
           data: [poblacion, restoPoblacion],
-          backgroundColor: [colorPrincipal, "rgba(255, 255, 255, 0.1)"],
+          backgroundColor: [colorPrincipal, "#1e293b"],
           borderColor: "rgba(255, 255, 255, 0.2)",
           borderWidth: 1,
         },
