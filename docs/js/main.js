@@ -84,8 +84,21 @@ function crearGrafico(datos) {
         },
         tooltip: {
           callbacks: {
-            label: (context) =>
-              ` ${context.dataset.label}: ${context.parsed.y.toLocaleString("es-CL")} pers.`,
+            label: (context) => {
+              const valor = context.parsed.y;
+              
+              // Sumamos los datos de las 3 porciones de la barra para obtener el 100%
+              let totalPoblacion = 0;
+              context.chart.data.datasets.forEach((dataset) => {
+                totalPoblacion += dataset.data[0]; 
+              });
+
+              // Calculamos el porcentaje
+              const porcentaje = ((valor / totalPoblacion) * 100).toFixed(1);
+
+              // Retornamos el string con el formato deseado
+              return ` ${context.dataset.label}: ${valor.toLocaleString("es-CL")} (${porcentaje}%)`;
+            },
           },
         },
       },
@@ -340,7 +353,7 @@ function crearGrafico(datos) {
           }
         }
       },
-      onClick: (event, elements, chart) => {
+      onClick: async (event, elements, chart) => {
         if (elements.length > 0) {
           const datasetIndex = elements[0].datasetIndex;
           const dataIndex = elements[0].index;
@@ -351,7 +364,6 @@ function crearGrafico(datos) {
           const colorLinea = chart.data.datasets[datasetIndex].borderColor;
 
           const poblacionTotalDelAño = totalesPorAño[dataIndex];
-
           const xCoord = elements[0].element.x;
           const yCoord = elements[0].element.y;
 
@@ -364,6 +376,31 @@ function crearGrafico(datos) {
             xCoord,
             yCoord,
           );
+          // 2. NUEVA LÓGICA DE FEEDBACK SONORO AL CLIC
+          await Tone.start();
+          // Proporcion de la poblacion
+          const proporcion = poblacion / poblacionTotalDelAño;
+          // Control de magnitud del volumen segun proporcion
+          const minDb = -25;
+          const maxDb = 0;
+          const volumenDb = minDb + (proporcion * (maxDb - minDb));
+          // Creamos un sintetizador temporal para el "beep"
+          const synthClick = new Tone.Synth({
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 1 }
+          }).toDestination();
+
+          // Asignamos el volumen calculado
+          synthClick.volume.value = volumenDb;
+          const nota = (datasetIndex === 0) ? "C6" : "C3"; // Elige entre dos notas
+
+          // Reproducimos la nota
+          synthClick.triggerAttackRelease(nota, "8n");
+          // Destruimos el nodo de audio tras 2 segundos para evitar fugas de memoria si hacen muchos clics
+          setTimeout(() => {
+            synthClick.dispose();
+          }, 2000);
+
         }
       },
       responsive: true,
