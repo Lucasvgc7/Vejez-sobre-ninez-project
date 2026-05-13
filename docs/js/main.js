@@ -103,6 +103,27 @@ function crearGrafico(datos) {
   });
 
   // ==========================================
+  // VARIABLES Y LÓGICA DE TONE.JS (Global para todo el gráfico)
+  // ==========================================
+  let synthJovenes = null; 
+  let synthMayores = null; 
+  let loopSonoro = null;
+  const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
+  const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
+
+  // Función auxiliar para inicializar sintetizadores de forma segura
+  const inicializarSintetizadores = async () => {
+    await Tone.start();
+    if (!synthJovenes) {
+      synthJovenes = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
+      synthJovenes.volume.value = -12;
+      synthMayores = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
+      synthMayores.volume.value = -6;
+    }
+  };
+
+
+  // ==========================================
   // PLUGINS Y GRÁFICO PRINCIPAL
   // ==========================================
   const pluginProyeccion = {
@@ -241,39 +262,37 @@ function crearGrafico(datos) {
           const xCoord = elements[0].element.x;
           const yCoord = elements[0].element.y;
 
-          generarGraficoPastel(
-            año,
-            etiqueta,
-            poblacion,
-            poblacionTotalDelAño,
-            colorLinea,
-            xCoord,
-            yCoord,
-          );
-          // 2. NUEVA LÓGICA DE FEEDBACK SONORO AL CLIC
-          await Tone.start();
-          // Proporcion de la poblacion
-          const proporcion = poblacion / poblacionTotalDelAño;
-          // Control de magnitud del volumen segun proporcion
-          const minDb = -25;
-          const maxDb = 0;
-          const volumenDb = minDb + (proporcion * (maxDb - minDb));
-          // Creamos un sintetizador temporal para el "beep"
-          const synthClick = new Tone.Synth({
-            oscillator: { type: "triangle" },
-            envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 1 }
-          }).toDestination();
+          generarGraficoPastel(año, etiqueta, poblacion, poblacionTotalDelAño, colorLinea, xCoord, yCoord);
 
-          // Asignamos el volumen calculado
-          synthClick.volume.value = volumenDb;
-          const nota = (datasetIndex === 0) ? "C6" : "C3"; // Elige entre dos notas
+          // 2. NUEVA LÓGICA DE FEEDBACK SONORO AL CLIC (Basada en densidad/cantidad)
+          await inicializarSintetizadores();
+          
+          // Rescatamos el porcentaje real para mantener la escala sonora
+          const porcentajeReal = (datasetIndex === 0) ? pctJovenes[dataIndex] : pctMayores[dataIndex];
+          
+          const divisor = 8; 
+          const exponente = 1.5;
+          const cantidadSonidos = Math.max(1, Math.floor(Math.pow(porcentajeReal / divisor, exponente)));
+          
+          // Definimos una ventana de tiempo corta para el "cluster" de clics (0.25 segundos)
+          const duracionPaso = 0.25; 
 
-          // Reproducimos la nota
-          synthClick.triggerAttackRelease(nota, "8n");
-          // Destruimos el nodo de audio tras 2 segundos para evitar fugas de memoria si hacen muchos clics
-          setTimeout(() => {
-            synthClick.dispose();
-          }, 2000);
+          if (datasetIndex === 0) {
+              // Clic en línea de Jóvenes
+              for (let i = 0; i < cantidadSonidos; i++) {
+                  const desfase = Math.random() * duracionPaso;
+                  const notaAleatoria = notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
+                  // Usamos Tone.now() para disparar en relación al tiempo actual exacto
+                  synthJovenes.triggerAttackRelease(notaAleatoria, "32n", Tone.now() + desfase);
+              }
+          } else {
+              // Clic en línea de Mayores
+              for (let i = 0; i < cantidadSonidos; i++) {
+                  const desfase = Math.random() * duracionPaso;
+                  const notaAleatoria = notasMayores[Math.floor(Math.random() * notasMayores.length)];
+                  synthMayores.triggerAttackRelease(notaAleatoria, "16n", Tone.now() + desfase);
+              }
+          }
 
         }
       },
@@ -305,8 +324,6 @@ function crearGrafico(datos) {
     const contenedor = document.getElementById("contenedorPastel");
     const canvasPrincipal = document.getElementById("miGrafico");
     
-    // Si el contenedor está visible y el clic NO es dentro del contenedor 
-    // y NO es dentro del gráfico principal (para permitir que onClick funcione)
     if (contenedor.style.display === "block" && 
         !contenedor.contains(event.target) && 
         event.target !== canvasPrincipal) {
@@ -314,21 +331,15 @@ function crearGrafico(datos) {
     }
   });
 
-  // --- LÓGICA DE TONE.JS (Se mantiene igual) ---
-  let synthJovenes = null; let synthMayores = null; let loopSonoro = null;
-  const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
-  const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
+  // ==========================================
+  // BOTONES DE REPRODUCCIÓN Y PAUSA
+  // ==========================================
   const btnReproducir = document.getElementById("btnReproducir");
   const btnPausa = document.getElementById("btnPausa"); 
 
   btnReproducir.addEventListener("click", async () => {
-    await Tone.start();
-    if (!synthJovenes) {
-      synthJovenes = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
-      synthJovenes.volume.value = -12;
-      synthMayores = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
-      synthMayores.volume.value = -6;
-    }
+    await inicializarSintetizadores();
+    
     if (indiceReproduccion >= años.length || indiceReproduccion === -1) { indiceReproduccion = 0; }
     btnReproducir.disabled = true; btnPausa.disabled = false;
     btnReproducir.innerText = "Reproduciendo..."; btnPausa.innerText = "⏸ Pausar";
@@ -376,7 +387,7 @@ function crearGrafico(datos) {
 }
 
 // ==========================================
-// LÓGICA DEL GRÁFICO DE PASTEL FLOTANTE (CON LEYENDA INTEGRADA)
+// LÓGICA DEL GRÁFICO DE PASTEL FLOTANTE 
 // ==========================================
 function generarGraficoPastel(año, etiqueta, poblacion, poblacionTotalDelAño, colorPrincipal, x, y) {
   const contenedor = document.getElementById("contenedorPastel");
@@ -392,7 +403,6 @@ function generarGraficoPastel(año, etiqueta, poblacion, poblacionTotalDelAño, 
   contenedor.style.top = `${posTop}px`;
   contenedor.style.display = "block";
   
-  // Integramos la información clave en el título para "limpiar" el gráfico
   titulo.innerHTML = `<span style="color:${colorPrincipal}">${etiqueta}</span> en ${año}<br><small style="font-weight:normal; opacity:0.8">vs Población Total</small>`;
 
   const restoPoblacion = poblacionTotalDelAño - poblacion;
@@ -413,7 +423,7 @@ function generarGraficoPastel(año, etiqueta, poblacion, poblacionTotalDelAño, 
       responsive: true,
       plugins: {
         legend: {
-          display: false, // Ocultamos la leyenda externa para que parezca integrada
+          display: false, 
         },
         tooltip: {
           enabled: true,
