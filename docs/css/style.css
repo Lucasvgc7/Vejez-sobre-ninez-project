@@ -25,3 +25,25 @@ body {
     font-style: italic;
     text-align: center;
 }
+
+.btn-play {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    background-color: #36A2EB;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-play:hover {
+    background-color: #2b84c0;
+}
+
+.btn-play:disabled {
+    background-color: #64748b; cursor: not-allowed;
+}
