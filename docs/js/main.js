@@ -118,7 +118,7 @@ function crearGrafico(datos) {
       synthJovenes = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
       synthJovenes.volume.value = -12;
       synthMayores = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.025, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
-      synthMayores.volume.value = -6;
+      synthMayores.volume.value = 0;
     }
   };
 
@@ -272,10 +272,10 @@ function crearGrafico(datos) {
           
           const divisor = 8; 
           const exponente = 1.5;
-          const cantidadSonidos = Math.max(1, Math.floor(Math.pow(porcentajeReal / divisor, exponente)));
+          const cantidadSonidos = Math.max(1, Math.floor(Math.pow(porcentajeReal / divisor, exponente))) * 2;
           
           // Definimos una ventana de tiempo corta para el "cluster" de clics (0.25 segundos)
-          const duracionPaso = 0.25; 
+          const duracionPaso = 0.5; 
 
           if (datasetIndex === 0) {
               // Clic en línea de Jóvenes
