@@ -3,68 +3,101 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tracker de Figuras</title>
+    <title>Tracker Calibrado</title>
+    <style>
+      body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; color: white;}
+      #ui-layer { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; z-index: 100; max-width: 320px; }
+      button { background: #36A2EB; color: white; border: none; padding: 10px 12px; margin: 5px 0; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; font-size: 13px;}
+      button:disabled { background: #555; cursor: not-allowed; color: #d8d8d8;}
+      .status { color: #00ff00; font-family: monospace; font-size: 14px; background: #111; padding: 10px; border-radius: 4px;}
+    </style>
   </head>
-  <body style="margin: 0; overflow: hidden; background-color: #000;">
+  <body>
     
-    <!-- NUEVO: Panel de depuración visual -->
-    <div id="panelDebug" style="position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.8); color: #00ff00; padding: 15px; font-family: monospace; border-radius: 8px; z-index: 100; pointer-events: none;">
-        Iniciando cámara...
+    <div id="ui-layer">
+      <div id="controles-calibracion">
+        <h3 style="margin-top:0; margin-bottom: 5px;">Calibración de la Balanza</h3>
+        <p style="font-size: 12px; color: #cbd5e1; margin-bottom: 15px;">Asegúrate de que ambos ArUcos se vean en la cámara. (ID 0: Jóvenes, ID 1: Mayores)</p>
+        
+        <button id="btnPasado" onclick="calibrarPasado()">1. Sube al Joven al tope y presiona</button>
+        <button id="btnFuturo" onclick="calibrarFuturo()">2. Sube al Viejo al tope y presiona</button>
+        <button id="btnIniciar" onclick="iniciarTracking()" disabled style="background: #10b981; margin-top: 15px; margin-bottom: 15px;">3. ¡Iniciar Interacción!</button>
+      </div>
+      
+      <div class="status" id="panelDebug">Cargando cámara...</div>
     </div>
 
     <script src="https://app.protobject.com/framework/p.js"></script>
     <script src="./js/config.js"></script>
     <script>
-      // 1. Iniciamos la cámara (Asegúrate de que el índice sea 0 o 1 según tu dispositivo)
       Protobject.Aruco.start(30, 0); 
       Protobject.Aruco.showPreview({ top: 0, left: 0, width: 640, height: 480 });
 
       const ID_JOVENES = 0;
       const ID_MAYORES = 1;
-      const panelDebug = document.getElementById("panelDebug");
+      
+      let diffPasado = null; 
+      let diffFuturo = null; 
+      let diffActual = 0;
+      let calibrado = false;
+
+      function calibrarPasado() {
+        diffPasado = diffActual;
+        document.getElementById("btnPasado").innerText = `✓ Tope Pasado fijado (${diffPasado.toFixed(2)})`;
+        document.getElementById("btnPasado").style.background = "#059669";
+        verificarInicio();
+      }
+
+      function calibrarFuturo() {
+        diffFuturo = diffActual;
+        document.getElementById("btnFuturo").innerText = `✓ Tope Futuro fijado (${diffFuturo.toFixed(2)})`;
+        document.getElementById("btnFuturo").style.background = "#059669";
+        verificarInicio();
+      }
+
+      function verificarInicio() {
+        if(diffPasado !== null && diffFuturo !== null) {
+          document.getElementById("btnIniciar").disabled = false;
+        }
+      }
+
+      function iniciarTracking() {
+        calibrado = true;
+        // NUEVO: Ocultamos el div completo de la interfaz de calibración
+        document.getElementById("controles-calibracion").style.display = "none";
+      }
 
       Protobject.Aruco.onData((data) => {
-        // --- LÓGICA DE DEPURACIÓN (DEBUG) EN PANTALLA ---
-        let textoDebug = "<strong>ESTADO DE LOS MARCADORES:</strong><br><br>";
+        const panel = document.getElementById("panelDebug");
         
-        if (data[ID_JOVENES]) {
-            textoDebug += `🟢 ID 1 (Jóvenes): Detectado | Y: ${Math.round(data[ID_JOVENES].position.y)}<br>`;
-        } else {
-            textoDebug += `🔴 ID 1 (Jóvenes): NO DETECTADO<br>`;
-        }
-
-        if (data[ID_MAYORES]) {
-            textoDebug += `🟢 ID 2 (Mayores): Detectado | Y: ${Math.round(data[ID_MAYORES].position.y)}<br>`;
-        } else {
-            textoDebug += `🔴 ID 2 (Mayores): NO DETECTADO<br>`;
-        }
-
-        // --- LÓGICA DE MOVIMIENTO ---
         if (data[ID_JOVENES] && data[ID_MAYORES]) {
           const yJovenes = data[ID_JOVENES].position.y;
           const yMayores = data[ID_MAYORES].position.y;
 
-          const diferencia = yJovenes - yMayores;
-          let direccion = 0;
+          // Matemática física: Y crece hacia abajo en la pantalla
+          diffActual = yJovenes - yMayores;
 
-          if (diferencia > 0.10) {
-            direccion = 1; 
-            textoDebug += `<br>➡️ ACCIÓN: Avanzando al futuro (Diferencia: ${Math.round(diferencia)}px)`;
-          } else if (diferencia < -0.10) {
-            direccion = -1;
-            textoDebug += `<br>⬅️ ACCIÓN: Retrocediendo al pasado (Diferencia: ${Math.round(diferencia)}px)`;
+          if(!calibrado) {
+             panel.innerHTML = `🟢 Marcadores detectados<br>Δy actual: ${diffActual.toFixed(2)}`;
           } else {
-            textoDebug += `<br>⏸️ ACCIÓN: Zona neutra, a la par (Diferencia: ${Math.round(diferencia)}px)`;
+             let posicionNormalizada = 0;
+
+             // Calculamos un porcentaje de posición (-1 a 1) respecto a los límites calibrados
+             if (diffActual <= 0) {
+                const limite = Math.min(-0.01, diffPasado); // Límite negativo
+                posicionNormalizada = Math.max(-1, (diffActual / limite) * -1); 
+             } else {
+                const limite = Math.max(0.01, diffFuturo); // Límite positivo
+                posicionNormalizada = Math.min(1, diffActual / limite);
+             }
+
+             panel.innerHTML = `📡 Transmitiendo...<br>Proporción: ${(posicionNormalizada).toFixed(2)}`;
+             Protobject.Core.send({ position: posicionNormalizada }).to('index.html');
           }
-
-          Protobject.Core.send({ direccion: direccion }).to('index.html');
         } else {
-          textoDebug += `<br>⚠️ ACCIÓN: Esperando ambos marcadores...`;
-          Protobject.Core.send({ direccion: 0 }).to('index.html');
+          diffActual = 0;
+          panel.innerHTML = calibrado ? "⚠️ Esperando marcadores..." : "🔴 Pon ambos ArUcos en cámara";
         }
-
-        // Actualizamos el panel en la pantalla
-        panelDebug.innerHTML = textoDebug;
       });
     </script>
   </body>

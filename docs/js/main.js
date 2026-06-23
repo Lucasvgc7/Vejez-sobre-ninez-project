@@ -35,7 +35,11 @@ function crearGrafico(datos) {
     .filter((fila) => fila.Grupo_Edad === "60+")
     .map((fila) => fila.PORCENTAJE);
 
+  // Mantenemos 2024 para la línea visual de proyecciones
   const index2024 = años.indexOf(2024);
+  // NUEVO: Agregamos 2027 como el centro físico (intersección real)
+  const index2027 = años.indexOf(2027); 
+  
   let indiceReproduccion = -1;
   let añoHoverActual = -1;
 
@@ -115,7 +119,6 @@ function crearGrafico(datos) {
     }
   };
 
-  // NUEVO: Desbloqueo global de audio en el primer clic del usuario en la pantalla
   const desbloquearAudio = async () => {
     try {
       await inicializarSintetizadores();
@@ -130,7 +133,6 @@ function crearGrafico(datos) {
   };
   window.addEventListener('pointerdown', desbloquearAudio);
   window.addEventListener('click', desbloquearAudio);
-
 
   // ==========================================
   // PLUGINS Y GRÁFICO PRINCIPAL
@@ -332,32 +334,38 @@ function crearGrafico(datos) {
   });
 
   // ==========================================
-  // LÓGICA DE PROTOBJECT Y ARUCO (Control Físico con Sonido)
+  // LÓGICA DE PROTOBJECT Y ARUCO (Mapeo Absoluto a 2027)
   // ==========================================
-  let direccionAruco = 0;
+  let targetIndexAruco = -1;
 
   if (typeof Protobject !== "undefined") {
     Protobject.Core.onReceived((msg) => {
-      if (msg.direccion !== undefined) {
-        direccionAruco = msg.direccion;
+      // Utilizamos index2027 como el centro físico de la balanza
+      if (msg.position !== undefined && index2027 !== -1) {
+        
+        let val = Math.max(-1, Math.min(1, msg.position));
+        
+        if (val <= 0) {
+          // Mapeamos el rango [-1, 0] hacia [0, 2027]
+          targetIndexAruco = Math.round(index2027 + (val * index2027));
+        } else {
+          // Mapeamos el rango [0, 1] hacia [2027, fin de las proyecciones]
+          targetIndexAruco = Math.round(index2027 + (val * (años.length - 1 - index2027)));
+        }
+        
+        targetIndexAruco = Math.max(0, Math.min(años.length - 1, targetIndexAruco));
       }
     });
   }
 
-  // ACTUALIZACIÓN: Bucle asíncrono para despertar el audio de manera segura
   setInterval(async () => {
-    if (direccionAruco !== 0 && Tone.Transport.state !== "started") {
+    if (targetIndexAruco !== -1 && Tone.Transport.state !== "started") {
       
-      if (indiceReproduccion === -1) indiceReproduccion = 0;
+      if (targetIndexAruco !== indiceReproduccion) {
+        
+        indiceReproduccion = targetIndexAruco;
 
-      const indiceAnterior = indiceReproduccion;
-      indiceReproduccion += direccionAruco;
-
-      if (indiceReproduccion < 0) indiceReproduccion = 0;
-      if (indiceReproduccion >= años.length) indiceReproduccion = años.length - 1;
-
-      if (indiceAnterior !== indiceReproduccion) {
-        // 1. Actualizar UI
+        // 1. Actualizar Barras
         const jAruco = pobJovenes[indiceReproduccion];
         const mAruco = pobMayores[indiceReproduccion];
         const rAruco = totalesPorAño[indiceReproduccion] - jAruco - mAruco;
@@ -401,9 +409,7 @@ function crearGrafico(datos) {
               synthMayores.triggerAttackRelease(notaAleatoria, "16n", now + desfase);
             }
           }
-        } catch (e) {
-          // El bloque falla en silencio si mueves el ArUco sin haber clickeado la pantalla antes
-        }
+        } catch (e) {}
       }
     }
   }, 150);
