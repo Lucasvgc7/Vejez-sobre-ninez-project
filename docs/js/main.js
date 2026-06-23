@@ -68,12 +68,10 @@ function crearGrafico(datos) {
           callbacks: {
             label: (context) => {
               const valor = context.parsed.y;
-              
               let totalPoblacion = 0;
               context.chart.data.datasets.forEach((dataset) => {
                 totalPoblacion += dataset.data[0]; 
               });
-
               const porcentaje = ((valor / totalPoblacion) * 100).toFixed(1);
               return ` ${context.dataset.label}: ${valor.toLocaleString("es-CL")} (${porcentaje}%)`;
             },
@@ -99,7 +97,7 @@ function crearGrafico(datos) {
   });
 
   // ==========================================
-  // VARIABLES Y LÓGICA DE TONE.JS (Global para todo el gráfico)
+  // VARIABLES Y LÓGICA DE TONE.JS
   // ==========================================
   let synthJovenes = null; 
   let synthMayores = null; 
@@ -116,6 +114,22 @@ function crearGrafico(datos) {
       synthMayores.volume.value = 0;
     }
   };
+
+  // NUEVO: Desbloqueo global de audio en el primer clic del usuario en la pantalla
+  const desbloquearAudio = async () => {
+    try {
+      await inicializarSintetizadores();
+      if (Tone.context.state !== 'running') {
+        await Tone.context.resume();
+      }
+      window.removeEventListener('pointerdown', desbloquearAudio);
+      window.removeEventListener('click', desbloquearAudio);
+    } catch (e) {
+      console.warn("Esperando interacción del usuario para el audio.");
+    }
+  };
+  window.addEventListener('pointerdown', desbloquearAudio);
+  window.addEventListener('click', desbloquearAudio);
 
 
   // ==========================================
@@ -318,11 +332,10 @@ function crearGrafico(datos) {
   });
 
   // ==========================================
-  // NUEVO: LÓGICA DE PROTOBJECT Y ARUCO (Control Físico)
+  // LÓGICA DE PROTOBJECT Y ARUCO (Control Físico con Sonido)
   // ==========================================
   let direccionAruco = 0;
 
-  // Escuchamos el evento que llega desde tracker.html a través de Protobject
   if (typeof Protobject !== "undefined") {
     Protobject.Core.onReceived((msg) => {
       if (msg.direccion !== undefined) {
@@ -331,35 +344,69 @@ function crearGrafico(datos) {
     });
   }
 
-  // Animamos el recorrido de forma continua si se tira de las cuerdas
-  setInterval(() => {
-    // Si la cámara nos dice que avancemos o retrocedamos, y la reproducción automática no está encendida
+  // ACTUALIZACIÓN: Bucle asíncrono para despertar el audio de manera segura
+  setInterval(async () => {
     if (direccionAruco !== 0 && Tone.Transport.state !== "started") {
       
-      // Inicializamos si nunca se ha hecho click ni reproducido
       if (indiceReproduccion === -1) indiceReproduccion = 0;
 
+      const indiceAnterior = indiceReproduccion;
       indiceReproduccion += direccionAruco;
 
-      // Limitamos el índice para no salirnos de los límites del arreglo
       if (indiceReproduccion < 0) indiceReproduccion = 0;
       if (indiceReproduccion >= años.length) indiceReproduccion = años.length - 1;
 
-      // Actualizamos la barra lateral dinámicamente
-      const jAruco = pobJovenes[indiceReproduccion];
-      const mAruco = pobMayores[indiceReproduccion];
-      const rAruco = totalesPorAño[indiceReproduccion] - jAruco - mAruco;
+      if (indiceAnterior !== indiceReproduccion) {
+        // 1. Actualizar UI
+        const jAruco = pobJovenes[indiceReproduccion];
+        const mAruco = pobMayores[indiceReproduccion];
+        const rAruco = totalesPorAño[indiceReproduccion] - jAruco - mAruco;
 
-      document.getElementById("tituloBarra").innerText = `Población en ${años[indiceReproduccion]}`;
-      chartBarra.data.datasets[0].data = [jAruco];
-      chartBarra.data.datasets[1].data = [rAruco];
-      chartBarra.data.datasets[2].data = [mAruco];
-      chartBarra.update();
+        document.getElementById("tituloBarra").innerText = `Población en ${años[indiceReproduccion]}`;
+        chartBarra.data.datasets[0].data = [jAruco];
+        chartBarra.data.datasets[1].data = [rAruco];
+        chartBarra.data.datasets[2].data = [mAruco];
+        chartBarra.update();
+        miGrafico.update("none");
 
-      // Movemos visualmente el cursor de la línea de tiempo
-      miGrafico.update("none");
+        // 2. Disparar Sonido ArUco
+        try {
+          if (!synthJovenes || !synthMayores) {
+            await inicializarSintetizadores();
+          }
+          if (Tone.context.state !== "running") {
+            await Tone.context.resume();
+          }
+
+          if (Tone.context.state === "running") {
+            const valorJovenes = pctJovenes[indiceReproduccion];
+            const valorMayores = pctMayores[indiceReproduccion];
+            const divisor = 8; 
+            const exponente = 1.5;
+
+            const cantJovenes = Math.max(1, Math.floor(Math.pow(valorJovenes / divisor, exponente)));
+            const cantMayores = Math.max(1, Math.floor(Math.pow(valorMayores / divisor, exponente)));
+            
+            const duracionPaso = 0.15;
+            const now = Tone.now();
+
+            for (let i = 0; i < cantJovenes; i++) {
+              const desfase = Math.random() * duracionPaso;
+              const notaAleatoria = notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
+              synthJovenes.triggerAttackRelease(notaAleatoria, "32n", now + desfase);
+            }
+            for (let i = 0; i < cantMayores; i++) {
+              const desfase = Math.random() * duracionPaso;
+              const notaAleatoria = notasMayores[Math.floor(Math.random() * notasMayores.length)];
+              synthMayores.triggerAttackRelease(notaAleatoria, "16n", now + desfase);
+            }
+          }
+        } catch (e) {
+          // El bloque falla en silencio si mueves el ArUco sin haber clickeado la pantalla antes
+        }
+      }
     }
-  }, 100); // Se actualiza cada 100 milisegundos para dar un efecto de "scroll" fluido
+  }, 150);
 
   // ==========================================
   // BOTONES DE REPRODUCCIÓN Y PAUSA
@@ -369,6 +416,9 @@ function crearGrafico(datos) {
 
   btnReproducir.addEventListener("click", async () => {
     await inicializarSintetizadores();
+    if (Tone.context.state !== 'running') {
+      await Tone.context.resume();
+    }
     
     if (indiceReproduccion >= años.length || indiceReproduccion === -1) { indiceReproduccion = 0; }
     btnReproducir.disabled = true; btnPausa.disabled = false;

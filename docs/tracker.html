@@ -5,43 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tracker de Figuras</title>
   </head>
-  <body>
+  <body style="margin: 0; overflow: hidden; background-color: #000;">
+    
+    <!-- NUEVO: Panel de depuración visual -->
+    <div id="panelDebug" style="position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.8); color: #00ff00; padding: 15px; font-family: monospace; border-radius: 8px; z-index: 100; pointer-events: none;">
+        Iniciando cámara...
+    </div>
+
     <script src="https://app.protobject.com/framework/p.js"></script>
     <script src="./js/config.js"></script>
     <script>
-      // 1. Iniciamos la cámara
+      // 1. Iniciamos la cámara (Asegúrate de que el índice sea 0 o 1 según tu dispositivo)
       Protobject.Aruco.start(30, 0); 
       Protobject.Aruco.showPreview({ top: 0, left: 0, width: 640, height: 480 });
 
-      // Definimos los IDs que pegaste en el cartón
       const ID_JOVENES = 0;
       const ID_MAYORES = 1;
+      const panelDebug = document.getElementById("panelDebug");
 
       Protobject.Aruco.onData((data) => {
-        // Solo actuamos si ambos cartones están visibles en la cámara
+        // --- LÓGICA DE DEPURACIÓN (DEBUG) EN PANTALLA ---
+        let textoDebug = "<strong>ESTADO DE LOS MARCADORES:</strong><br><br>";
+        
+        if (data[ID_JOVENES]) {
+            textoDebug += `🟢 ID 1 (Jóvenes): Detectado | Y: ${Math.round(data[ID_JOVENES].position.y)}<br>`;
+        } else {
+            textoDebug += `🔴 ID 1 (Jóvenes): NO DETECTADO<br>`;
+        }
+
+        if (data[ID_MAYORES]) {
+            textoDebug += `🟢 ID 2 (Mayores): Detectado | Y: ${Math.round(data[ID_MAYORES].position.y)}<br>`;
+        } else {
+            textoDebug += `🔴 ID 2 (Mayores): NO DETECTADO<br>`;
+        }
+
+        // --- LÓGICA DE MOVIMIENTO ---
         if (data[ID_JOVENES] && data[ID_MAYORES]) {
           const yJovenes = data[ID_JOVENES].position.y;
           const yMayores = data[ID_MAYORES].position.y;
 
-          // Calculamos la diferencia de altura. En pantalla, Y crece hacia abajo.
           const diferencia = yJovenes - yMayores;
           let direccion = 0;
 
-          // Umbral de 40 píxeles para considerar que están "a la par" y no hacer nada
-          if (diferencia > 40) {
-            // Cartón de jóvenes está más abajo. (Avanzamos hacia el futuro, donde hay menos jóvenes)
+          if (diferencia > 0.10) {
             direccion = 1; 
-          } else if (diferencia < -40) {
-            // Cartón de mayores está más abajo. (Retrocedemos al pasado, donde hay menos mayores)
+            textoDebug += `<br>➡️ ACCIÓN: Avanzando al futuro (Diferencia: ${Math.round(diferencia)}px)`;
+          } else if (diferencia < -0.10) {
             direccion = -1;
+            textoDebug += `<br>⬅️ ACCIÓN: Retrocediendo al pasado (Diferencia: ${Math.round(diferencia)}px)`;
+          } else {
+            textoDebug += `<br>⏸️ ACCIÓN: Zona neutra, a la par (Diferencia: ${Math.round(diferencia)}px)`;
           }
 
-          // Enviamos la dirección al dashboard
           Protobject.Core.send({ direccion: direccion }).to('index.html');
         } else {
-          // Si alguno se pierde de la cámara, detenemos el movimiento
+          textoDebug += `<br>⚠️ ACCIÓN: Esperando ambos marcadores...`;
           Protobject.Core.send({ direccion: 0 }).to('index.html');
         }
+
+        // Actualizamos el panel en la pantalla
+        panelDebug.innerHTML = textoDebug;
       });
     </script>
   </body>
