@@ -38,18 +38,21 @@
       
       let diffPasado = null; 
       let diffFuturo = null; 
-      let diffActual = 0;
       let calibrado = false;
+      let diffSuavizada = 0; 
+      
+      // NUEVO: Variable para guardar la longitud virtual de la cuerda
+      let sumaY_cuerda = null; 
 
       function calibrarPasado() {
-        diffPasado = diffActual;
+        diffPasado = diffSuavizada;
         document.getElementById("btnPasado").innerText = `✓ Tope Pasado fijado (${diffPasado.toFixed(2)})`;
         document.getElementById("btnPasado").style.background = "#059669";
         verificarInicio();
       }
 
       function calibrarFuturo() {
-        diffFuturo = diffActual;
+        diffFuturo = diffSuavizada;
         document.getElementById("btnFuturo").innerText = `✓ Tope Futuro fijado (${diffFuturo.toFixed(2)})`;
         document.getElementById("btnFuturo").style.background = "#059669";
         verificarInicio();
@@ -63,40 +66,70 @@
 
       function iniciarTracking() {
         calibrado = true;
-        // NUEVO: Ocultamos el div completo de la interfaz de calibración
         document.getElementById("controles-calibracion").style.display = "none";
       }
 
       Protobject.Aruco.onData((data) => {
         const panel = document.getElementById("panelDebug");
         
-        if (data[ID_JOVENES] && data[ID_MAYORES]) {
-          const yJovenes = data[ID_JOVENES].position.y;
-          const yMayores = data[ID_MAYORES].position.y;
+        let yJovenes = null;
+        let yMayores = null;
+        let infoCamara = "";
 
-          // Matemática física: Y crece hacia abajo en la pantalla
-          diffActual = yJovenes - yMayores;
+        // 1. LÓGICA ANTI-OCLUSIÓN (Cuerda Virtual)
+        if (data[ID_JOVENES] && data[ID_MAYORES]) {
+            // Vemos ambos: Actualizamos sus posiciones y calibramos la longitud de la cuerda
+            yJovenes = data[ID_JOVENES].position.y;
+            yMayores = data[ID_MAYORES].position.y;
+            sumaY_cuerda = yJovenes + yMayores; 
+            infoCamara = "🟢 Ambos Detectados";
+
+        } else if (data[ID_JOVENES] && sumaY_cuerda !== null) {
+            // Solo vemos al Joven: Calculamos la posición "fantasma" del Mayor
+            yJovenes = data[ID_JOVENES].position.y;
+            yMayores = sumaY_cuerda - yJovenes; 
+            infoCamara = "🟡 Solo ID 0 (Infiriendo ID 1)";
+
+        } else if (data[ID_MAYORES] && sumaY_cuerda !== null) {
+            // Solo vemos al Mayor: Calculamos la posición "fantasma" del Joven
+            yMayores = data[ID_MAYORES].position.y;
+            yJovenes = sumaY_cuerda - yMayores;
+            infoCamara = "🟡 Solo ID 1 (Infiriendo ID 0)";
+        }
+
+        // 2. MATEMÁTICA Y TRANSMISIÓN (Solo se ejecuta si tenemos posiciones válidas o inferidas)
+        if (yJovenes !== null && yMayores !== null) {
+          
+          let diffCruda = yJovenes - yMayores;
+
+          if (diffSuavizada === 0) {
+              diffSuavizada = diffCruda;
+          } else {
+              diffSuavizada = (diffCruda * 0.10) + (diffSuavizada * 0.90);
+          }
 
           if(!calibrado) {
-             panel.innerHTML = `🟢 Marcadores detectados<br>Δy actual: ${diffActual.toFixed(2)}`;
+             panel.innerHTML = `${infoCamara}<br>Δy estable: ${diffSuavizada.toFixed(2)}`;
           } else {
              let posicionNormalizada = 0;
 
-             // Calculamos un porcentaje de posición (-1 a 1) respecto a los límites calibrados
-             if (diffActual <= 0) {
-                const limite = Math.min(-0.01, diffPasado); // Límite negativo
-                posicionNormalizada = Math.max(-1, (diffActual / limite) * -1); 
+             if (diffSuavizada <= 0) {
+                const limite = Math.min(-0.01, diffPasado); 
+                posicionNormalizada = Math.max(-1, (diffSuavizada / limite) * -1); 
              } else {
-                const limite = Math.max(0.01, diffFuturo); // Límite positivo
-                posicionNormalizada = Math.min(1, diffActual / limite);
+                const limite = Math.max(0.01, diffFuturo); 
+                posicionNormalizada = Math.min(1, diffSuavizada / limite);
              }
 
-             panel.innerHTML = `📡 Transmitiendo...<br>Proporción: ${(posicionNormalizada).toFixed(2)}`;
+             posicionNormalizada = Math.round(posicionNormalizada * 100) / 100;
+
+             panel.innerHTML = `${infoCamara}<br>Transmitiendo: ${posicionNormalizada}`;
              Protobject.Core.send({ position: posicionNormalizada }).to('index.html');
           }
         } else {
-          diffActual = 0;
-          panel.innerHTML = calibrado ? "⚠️ Esperando marcadores..." : "🔴 Pon ambos ArUcos en cámara";
+          // Si no ve NINGUNO, o si recién abrimos y aún no calibramos la cuerda
+          diffSuavizada = 0; 
+          panel.innerHTML = calibrado ? "⚠️ Esperando al menos 1 marcador..." : "🔴 Pon ambos cartones en cámara para iniciar";
         }
       });
     </script>
