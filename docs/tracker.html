@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tracker de Figuras</title>
+  </head>
+  <body>
+    <script src="https://app.protobject.com/framework/p.js"></script>
+    <script src="./js/config.js"></script>
+    <script>
+      // 1. Iniciamos la cámara
+      Protobject.Aruco.start(30, 1); 
+      Protobject.Aruco.showPreview({ top: 0, left: 0, width: 640, height: 480 });
+
+      // Definimos los IDs que pegaste en el cartón
+      const ID_JOVENES = 1;
+      const ID_MAYORES = 2;
+
+      Protobject.Aruco.onData((data) => {
+        // Solo actuamos si ambos cartones están visibles en la cámara
+        if (data[ID_JOVENES] && data[ID_MAYORES]) {
+          const yJovenes = data[ID_JOVENES].position.y;
+          const yMayores = data[ID_MAYORES].position.y;
+
+          // Calculamos la diferencia de altura. En pantalla, Y crece hacia abajo.
+          const diferencia = yJovenes - yMayores;
+          let direccion = 0;
+
+          // Umbral de 40 píxeles para considerar que están "a la par" y no hacer nada
+          if (diferencia > 40) {
+            // Cartón de jóvenes está más abajo. (Avanzamos hacia el futuro, donde hay menos jóvenes)
+            direccion = 1; 
+          } else if (diferencia < -40) {
+            // Cartón de mayores está más abajo. (Retrocedemos al pasado, donde hay menos mayores)
+            direccion = -1;
+          }
+
+          // Enviamos la dirección al dashboard
+          Protobject.Core.send({ direccion: direccion }).to('index.html');
+        } else {
+          // Si alguno se pierde de la cámara, detenemos el movimiento
+          Protobject.Core.send({ direccion: 0 }).to('index.html');
+        }
+      });
+    </script>
+  </body>
+</html>

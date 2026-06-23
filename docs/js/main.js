@@ -69,16 +69,12 @@ function crearGrafico(datos) {
             label: (context) => {
               const valor = context.parsed.y;
               
-              // Sumamos los datos de las 3 porciones de la barra para obtener el 100%
               let totalPoblacion = 0;
               context.chart.data.datasets.forEach((dataset) => {
                 totalPoblacion += dataset.data[0]; 
               });
 
-              // Calculamos el porcentaje
               const porcentaje = ((valor / totalPoblacion) * 100).toFixed(1);
-
-              // Retornamos el string con el formato deseado
               return ` ${context.dataset.label}: ${valor.toLocaleString("es-CL")} (${porcentaje}%)`;
             },
           },
@@ -111,7 +107,6 @@ function crearGrafico(datos) {
   const notasJovenes = ["C5", "E5", "G5", "B5", "D6", "F6"];
   const notasMayores = ["C2", "E2", "G2", "B2", "D3", "F3"];
 
-  // Función auxiliar para inicializar sintetizadores de forma segura
   const inicializarSintetizadores = async () => {
     await Tone.start();
     if (!synthJovenes) {
@@ -264,36 +259,27 @@ function crearGrafico(datos) {
 
           generarGraficoPastel(año, etiqueta, poblacion, poblacionTotalDelAño, colorLinea, xCoord, yCoord);
 
-          // 2. NUEVA LÓGICA DE FEEDBACK SONORO AL CLIC (Basada en densidad/cantidad)
           await inicializarSintetizadores();
-          
-          // Rescatamos el porcentaje real para mantener la escala sonora
           const porcentajeReal = (datasetIndex === 0) ? pctJovenes[dataIndex] : pctMayores[dataIndex];
-          
           const divisor = 8; 
           const exponente = 1.5;
+
           const cantidadSonidos = Math.max(1, Math.floor(Math.pow(porcentajeReal / divisor, exponente))) * 2;
-          
-          // Definimos una ventana de tiempo corta para el "cluster" de clics (0.25 segundos)
           const duracionPaso = 0.5; 
 
           if (datasetIndex === 0) {
-              // Clic en línea de Jóvenes
               for (let i = 0; i < cantidadSonidos; i++) {
                   const desfase = Math.random() * duracionPaso;
                   const notaAleatoria = notasJovenes[Math.floor(Math.random() * notasJovenes.length)];
-                  // Usamos Tone.now() para disparar en relación al tiempo actual exacto
                   synthJovenes.triggerAttackRelease(notaAleatoria, "32n", Tone.now() + desfase);
               }
           } else {
-              // Clic en línea de Mayores
               for (let i = 0; i < cantidadSonidos; i++) {
                   const desfase = Math.random() * duracionPaso;
                   const notaAleatoria = notasMayores[Math.floor(Math.random() * notasMayores.length)];
                   synthMayores.triggerAttackRelease(notaAleatoria, "16n", Tone.now() + desfase);
               }
           }
-
         }
       },
       responsive: true,
@@ -330,6 +316,50 @@ function crearGrafico(datos) {
       contenedor.style.display = "none";
     }
   });
+
+  // ==========================================
+  // NUEVO: LÓGICA DE PROTOBJECT Y ARUCO (Control Físico)
+  // ==========================================
+  let direccionAruco = 0;
+
+  // Escuchamos el evento que llega desde tracker.html a través de Protobject
+  if (typeof Protobject !== "undefined") {
+    Protobject.Core.onReceived((msg) => {
+      if (msg.direccion !== undefined) {
+        direccionAruco = msg.direccion;
+      }
+    });
+  }
+
+  // Animamos el recorrido de forma continua si se tira de las cuerdas
+  setInterval(() => {
+    // Si la cámara nos dice que avancemos o retrocedamos, y la reproducción automática no está encendida
+    if (direccionAruco !== 0 && Tone.Transport.state !== "started") {
+      
+      // Inicializamos si nunca se ha hecho click ni reproducido
+      if (indiceReproduccion === -1) indiceReproduccion = 0;
+
+      indiceReproduccion += direccionAruco;
+
+      // Limitamos el índice para no salirnos de los límites del arreglo
+      if (indiceReproduccion < 0) indiceReproduccion = 0;
+      if (indiceReproduccion >= años.length) indiceReproduccion = años.length - 1;
+
+      // Actualizamos la barra lateral dinámicamente
+      const jAruco = pobJovenes[indiceReproduccion];
+      const mAruco = pobMayores[indiceReproduccion];
+      const rAruco = totalesPorAño[indiceReproduccion] - jAruco - mAruco;
+
+      document.getElementById("tituloBarra").innerText = `Población en ${años[indiceReproduccion]}`;
+      chartBarra.data.datasets[0].data = [jAruco];
+      chartBarra.data.datasets[1].data = [rAruco];
+      chartBarra.data.datasets[2].data = [mAruco];
+      chartBarra.update();
+
+      // Movemos visualmente el cursor de la línea de tiempo
+      miGrafico.update("none");
+    }
+  }, 100); // Se actualiza cada 100 milisegundos para dar un efecto de "scroll" fluido
 
   // ==========================================
   // BOTONES DE REPRODUCCIÓN Y PAUSA
